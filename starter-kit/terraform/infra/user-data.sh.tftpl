@@ -1,0 +1,99 @@
+#!/bin/bash
+# First-boot script for the k3s node (skeleton).
+#
+# cloud-init runs this ONCE, as root, the first time the instance boots.
+# Terraform renders it with templatefile(), so:
+#
+#   ${k3s_version}             is replaced by Terraform BEFORE the instance sees it
+#   $${SOME_SHELL_VARIABLE}    two dollar signs: Terraform leaves a single
+#                              dollar sign, and bash expands it at boot
+#
+# Getting those two mixed up is the classic templatefile mistake. Terraform
+# fails with "Invalid reference" when it finds a single-dollar brace that is
+# not one of the variables you passed in.
+#
+# Debugging: this script's output goes to /var/log/cloud-init-output.log on
+# the instance. If k3s is not there after boot, read that file first:
+#   aws ssm start-session --target <instance-id>
+#   sudo tail -n 50 /var/log/cloud-init-output.log
+
+# Stop at the first failing command, treat unset variables as errors, and
+# print each command. A half-configured node that looks healthy is worse than
+# one that failed loudly.
+set -euxo pipefail
+
+# -----------------------------------------------------------------------------
+# TODO(3.4) step 1: cost safety net (dead-man switch).
+#
+# Schedule the machine to power itself off ${auto_shutdown_minutes} minutes
+# from now, FIRST, before anything that could fail. If you forget
+# `terraform destroy`, close the laptop, or the script below breaks, the
+# instance still stops costing credits.
+# One line with the standard `shutdown` command does it.
+# -----------------------------------------------------------------------------
+
+# -----------------------------------------------------------------------------
+# TODO(3.4) step 2: install k3s, pinned to ${k3s_version}.
+#
+# Use the official install script (https://get.k3s.io) and control it with
+# environment variables and flags rather than editing anything by hand:
+#
+#   INSTALL_K3S_VERSION    pins the release; without it every rebuild installs
+#                          whatever is newest that day
+#   --disable traefik      k3s bundles the Traefik ingress controller, which
+#                          claims ports 80 and 443 on the node. The MUST path
+#                          exposes the app with a LoadBalancer Service through
+#                          k3s's built-in ServiceLB, which needs port 80 free.
+#                          (Re-enabling Traefik with the Gateway API is a
+#                          SHOULD item in Week 4.)
+#
+# Read https://docs.k3s.io/installation/configuration before writing the line.
+# -----------------------------------------------------------------------------
+
+# -----------------------------------------------------------------------------
+# TODO(3.4) step 3: wait until the node reports Ready.
+#
+# The install script returns before the cluster is usable. Poll with the
+# bundled `k3s kubectl` and give up with a non-zero exit after a few minutes,
+# so a broken boot is visible in the log instead of looking finished.
+# -----------------------------------------------------------------------------
+
+# -----------------------------------------------------------------------------
+# TODO(3.4) step 4: install Helm ${helm_version}.
+#
+# The deploy pipeline runs `helm upgrade` ON this machine through Systems
+# Manager, so Helm must be here. Use the official installer script for Helm 4
+# from the helm/helm repository and pin the version (it reads DESIRED_VERSION).
+#
+# Helm needs to know where the cluster is. k3s writes its kubeconfig to
+# /etc/rancher/k3s/k3s.yaml, readable by root only. Leave those permissions
+# alone; Run Command executes as root. Make KUBECONFIG point at that file for
+# root's commands.
+# -----------------------------------------------------------------------------
+
+# -----------------------------------------------------------------------------
+# TODO(4.4) step 5 (leave this until Week 4): namespace and database password.
+#
+# The chart refers to a Kubernetes Secret by name and never contains the
+# password. Something has to create that Secret on a brand-new node, or the
+# Week 5 "rebuild from code" drill needs a manual step.
+#
+# Create the namespace, then create the Secret with a password GENERATED HERE
+# at boot (for example with `openssl rand -hex 24`), piped straight into
+# `k3s kubectl create secret generic ... --from-literal=...`.
+#
+# Why this is safe when "a secret in user data" normally is not: user data is
+# readable by anyone who can call ec2:DescribeInstanceAttribute, so a literal
+# password here would be exposed. A COMMAND that generates a password is not
+# a password. The value exists only inside the cluster, never in git, never
+# in Terraform state, never in a pipeline log.
+#
+# Careful with `set -x` above: it prints every command, with its arguments,
+# into /var/log/cloud-init-output.log. Switch tracing off around this step
+# (`set +x` ... `set -x`) or the generated password lands in that log.
+# -----------------------------------------------------------------------------
+
+# -----------------------------------------------------------------------------
+# TODO(3.4) step 6: leave a marker so you can tell the script finished, for
+# example a file under /var/lib/ with the versions that were installed.
+# -----------------------------------------------------------------------------

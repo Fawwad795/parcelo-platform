@@ -1,0 +1,17 @@
+# Force LF line endings in the repository and in your working copy.
+#
+# You are on Windows. Without this, Git may check files out with CRLF line
+# endings. A shell script with CRLF fails inside a Linux container or on an
+# EC2 instance with errors like "bad interpreter: /bin/bash^M" or
+# "$'\r': command not found", and the cause is invisible in most editors.
+# This one line prevents that whole class of problem.
+* text=auto eol=lf
+
+# Never touch binary files.
+*.png binary
+*.jpg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.zip binary
+*.tgz binary

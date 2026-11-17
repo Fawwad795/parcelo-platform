@@ -1,0 +1,78 @@
+# Week 2 skeleton: prove the Helm chart works on a real cluster, in CI.
+#
+# Copy to .github/workflows/k8s-smoke.yml at task 2.7.
+#
+# What this pipeline is for
+# -------------------------
+# "It deployed on my kind cluster" is the Kubernetes version of "works on my
+# machine". This workflow creates a throwaway kind cluster INSIDE the GitHub
+# runner on every pull request, installs your chart into it, and runs the
+# smoke test. If a chart change would break a deploy, you find out in the
+# pull request, not on AWS.
+#
+# The runner already has Docker, kind and kubectl. Its preinstalled Helm is
+# version 3; this project uses Helm 4, so install the pinned Helm 4 version
+# explicitly (see assignment/verified-versions.md).
+
+name: k8s-smoke
+
+on:
+  # TODO(2.7): run on pull requests that touch the chart, the Dockerfile, the
+  # app, or this workflow. Use a `paths` filter so a docs-only change does not
+  # spend ten minutes creating a cluster.
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Job 1: static checks on the chart (fast, no cluster)
+  #
+  # Must achieve:
+  #   - `helm lint` passes with each values file you ship
+  #   - `helm template` renders with each values file, and the rendered
+  #     manifests are valid against the Kubernetes API schemas (kubeconform
+  #     or `kubectl apply --dry-run=server` against the kind cluster below)
+  #
+  # Done when: a typo in a template or an invalid field fails this job in
+  # under a minute.
+  # ---------------------------------------------------------------------------
+  chart:
+    name: Lint and render chart
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Placeholder (replace with real steps)
+        run: |
+          echo "k8s-smoke.yml is still the starter-kit skeleton: the chart job has no real steps."
+          exit 1
+
+  # ---------------------------------------------------------------------------
+  # Job 2: install into an ephemeral kind cluster and smoke test
+  #
+  # Must achieve:
+  #   - build the image from this commit (do not pull one from GHCR: a pull
+  #     request has not published anything yet)
+  #   - create a kind cluster and load the image into it (`kind load
+  #     docker-image`), so the cluster uses exactly what was just built
+  #   - `helm upgrade --install` the chart with your kind values, waiting for
+  #     the rollout to finish, with a timeout
+  #   - run scripts/smoke.sh against the service (port-forward or NodePort)
+  #   - ON FAILURE, dump what a human would look at first: `kubectl get pods`,
+  #     `kubectl describe` of failing pods, and their logs. A red job with no
+  #     diagnostics wastes the next hour.
+  #
+  # Think about: imagePullPolicy. With a locally loaded image and the wrong
+  # pull policy, Kubernetes tries to pull from a registry and fails.
+  #
+  # Done when: breaking a probe path in the chart turns this job red, and the
+  # job log alone tells you why.
+  # ---------------------------------------------------------------------------
+  kind-smoke:
+    name: Install on kind and smoke test
+    runs-on: ubuntu-24.04
+    needs: chart
+    steps:
+      - name: Placeholder (replace with real steps)
+        run: |
+          echo "k8s-smoke.yml is still the starter-kit skeleton: the kind-smoke job has no real steps."
+          exit 1

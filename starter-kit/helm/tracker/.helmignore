@@ -1,0 +1,9 @@
+# Files Helm must not package into the chart archive.
+# Same syntax as .gitignore.
+.git/
+.gitignore
+*.swp
+*.bak
+*.tmp
+.DS_Store
+TEMPLATES-TODO.md

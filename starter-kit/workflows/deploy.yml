@@ -1,0 +1,100 @@
+# Week 4 skeleton: deploy a chosen image to the AWS cluster, verify it, and
+# roll back automatically if it is unhealthy.
+#
+# Copy to .github/workflows/deploy.yml at task 4.3.
+#
+# What this pipeline is for
+# -------------------------
+# Deploys at Parcelo are an SSH session on a Friday night with no way back.
+# This workflow replaces that with a button: choose a commit, approve, and
+# the pipeline either leaves the new build serving traffic or leaves the old
+# one untouched. There is no third outcome.
+#
+# How the deploy reaches the cluster
+# ----------------------------------
+# The k3s API server is NOT exposed to the internet, and there is no SSH key.
+# The job uses AWS Systems Manager Run Command to run `helm upgrade` on the
+# instance itself:
+#
+#   runner --OIDC--> AWS (deploy role) --SSM Run Command--> instance --> helm
+#
+# The instance pulls the chart (an OCI artifact in GHCR) and the image by
+# itself. The deploy role needs permission to do exactly three things: find
+# the instance by tag, send one kind of command to instances carrying that
+# tag, and read the result. Nothing else.
+#
+# Helm 4 note: the flag that undoes a failed upgrade is
+# `--rollback-on-failure`. Older posts call it `--atomic`, the Helm 3 name,
+# which the Helm 4.3 documentation no longer lists.
+
+name: deploy
+
+on:
+  # TODO(4.3): keep the manual trigger and add an input for the commit SHA
+  # (or image tag) to deploy. Deploying "whatever is latest" is how you lose
+  # track of what is running; deploying a named commit is how you keep it.
+  # SHOULD: also deploy automatically after `ci` succeeds on main.
+  workflow_dispatch:
+
+permissions: {}
+
+# TODO(4.3): one deploy at a time. Queue, do not cancel: two overlapping
+# `helm upgrade` runs against the same release fail with "another operation
+# is in progress".
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Job 1: deploy
+  #
+  # Must achieve:
+  #   - use the `production` environment (required reviewer: you)
+  #   - assume the deploy role with OIDC
+  #   - find the running instance by tag; fail clearly if there is none or
+  #     more than one (the instance is rebuilt often, so never hard-code an id)
+  #   - send ONE Run Command that runs, on the instance:
+  #       helm upgrade --install <release> <chart from GHCR> --version <chart version>
+  #         with your AWS values, the image tag and GIT_SHA set to the chosen
+  #         commit, --wait, a --timeout, and --rollback-on-failure
+  #   - wait for the command to finish and FAIL THE JOB if it failed, printing
+  #     the command output either way (a deploy log nobody can read is not a
+  #     deploy log)
+  #
+  # Permissions needed: `id-token: write`, `contents: read`.
+  #
+  # Done when: the job is green only if the new pods became ready, and red
+  # with readable Helm output when they did not.
+  # ---------------------------------------------------------------------------
+  deploy:
+    name: Deploy to AWS
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Placeholder (replace with real steps)
+        run: |
+          echo "deploy.yml is still the starter-kit skeleton: the deploy job has no real steps."
+          exit 1
+
+  # ---------------------------------------------------------------------------
+  # Job 2: verify from the outside
+  #
+  # Must achieve:
+  #   - look up the instance's public IP
+  #   - run scripts/smoke.sh against it, passing the deployed commit SHA as
+  #     the expected build, so "green" means the NEW build is serving
+  #
+  # Think about: Helm already waited for readiness. Why is an outside-in
+  # check still worth having? (What can be healthy inside the cluster and
+  # unreachable from the internet?)
+  #
+  # Done when: the bad-deploy drill (Week 4) ends with this pipeline red,
+  # the previous build still answering /version, and you having done nothing
+  # by hand.
+  # ---------------------------------------------------------------------------
+  verify:
+    name: Smoke test the live service
+    runs-on: ubuntu-24.04
+    needs: deploy
+    steps:
+      - name: Placeholder (replace with real steps)
+        run: |
+          echo "deploy.yml is still the starter-kit skeleton: the verify job has no real steps."
+          exit 1

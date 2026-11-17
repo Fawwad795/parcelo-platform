@@ -1,0 +1,42 @@
+[project]
+name = "parcelo-tracker"
+version = "1.0.0"
+description = "Parcel tracking API used as the workload for the Parcelo DevOps assignment"
+# Tested on 3.12 (Ubuntu 24.04 default) and 3.13 (the container and CI).
+requires-python = ">=3.12"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q --strict-markers"
+markers = [
+    "integration: needs a real PostgreSQL (set TEST_DATABASE_URL); skipped otherwise",
+]
+
+[tool.coverage.run]
+source = ["app"]
+branch = true
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+# The pipeline fails below this number. Raise it if you add tests; never lower
+# it to make a red build green.
+fail_under = 90
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+extend-exclude = ["migrations/versions"]
+
+[tool.ruff.lint]
+# E/W pycodestyle, F pyflakes, I import order, B bugbear, UP modern syntax,
+# S security checks (bandit rules).
+select = ["E", "W", "F", "I", "B", "UP", "S"]
+
+[tool.ruff.lint.per-file-ignores]
+# assert is how pytest works; fixed test credentials are not secrets.
+"tests/*" = ["S101", "S105", "S106"]
+# random is used only for the chaos switch, not for anything security related.
+"app/main.py" = ["S311"]
+# assert narrows an Optional for the type checker after get_engine().
+"app/db.py" = ["S101"]

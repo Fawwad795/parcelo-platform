@@ -1,0 +1,9 @@
+# Development and CI dependencies. These must NOT end up in the production
+# image: they add size and attack surface and are never used at runtime.
+-r requirements.txt
+pytest==9.2.0
+pytest-cov==7.1.0
+# httpx2 is what FastAPI's TestClient uses. The older httpx package still
+# works but is deprecated for this purpose as of Starlette 1.x.
+httpx2==2.16.0
+ruff==0.17.4

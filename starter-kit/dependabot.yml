@@ -1,0 +1,36 @@
+# Week 1 skeleton: Dependabot version updates.
+#
+# Copy to .github/dependabot.yml at task 1.9.
+#
+# Why this exists
+# ---------------
+# You pin everything (actions to commit SHAs, Python packages to exact
+# versions, the base image to a digest) so builds are reproducible. Pinning
+# without updating is how projects end up three years behind on security
+# fixes. Dependabot opens a pull request when a pinned dependency has a newer
+# release, your CI runs on that pull request, and you merge if it is green.
+# Pin for safety, automate for freshness.
+#
+# Dependabot understands SHA-pinned actions: it updates the SHA and the
+# version comment together, as long as you keep the `# vX.Y.Z` comment.
+
+version: 2
+
+updates:
+  # GitHub Actions used in .github/workflows.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    # TODO(1.9): group minor and patch updates into one pull request so you
+    # get one PR a week instead of ten. Decide whether major updates should
+    # be grouped too, and why not.
+
+  # TODO(1.9): add an entry for the Python packages in requirements*.txt
+  # (ecosystem: pip).
+
+  # TODO(1.9): add an entry for the base image in the Dockerfile
+  # (ecosystem: docker).
+
+  # TODO(3.8, SHOULD): add an entry for Terraform providers
+  # (ecosystem: terraform, directory: /terraform/infra).

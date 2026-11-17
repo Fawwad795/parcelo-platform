@@ -1,0 +1,72 @@
+# kind cluster for local Kubernetes work (Weeks 2 and 4).
+#
+# Copy to k8s/kind-config.yaml, then:
+#
+#   kind create cluster --config k8s/kind-config.yaml
+#   kubectl cluster-info --context kind-parcelo
+#   kind delete cluster --name parcelo          # when you are done for the day
+#
+# READ THIS FILE. kind ("Kubernetes in Docker") runs each Kubernetes node as a
+# Docker container. That is why a cluster starts in under a minute and why
+# deleting it leaves nothing behind. It is also why networking has one extra
+# hop that confuses everyone once:
+#
+#   your browser (Windows)
+#     -> localhost:8080            Docker Desktop forwards this into WSL2
+#     -> node container :30080     the extraPortMappings entry below
+#     -> NodePort Service :30080   routes to a pod
+#     -> pod :8000                 the app
+#
+# If something in that chain is missing, the request fails with "connection
+# refused" and nothing in `kubectl get pods` looks wrong. When in doubt, test
+# from inside the chain with `kubectl port-forward`, which skips the first
+# three hops.
+
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+
+# The kubectl context will be `kind-parcelo`. Always pass --context or check
+# `kubectl config current-context` before running anything destructive. In
+# Week 3 you will also have a context for the AWS cluster, and running a
+# command against the wrong cluster is a classic incident.
+name: parcelo
+
+nodes:
+  # One node that is both control plane and worker. Enough for this project
+  # and light on memory. kind allows workloads on a single control-plane node
+  # by default.
+  - role: control-plane
+
+    # The node image decides the Kubernetes version. Pinning it by digest
+    # means the cluster you create next week is the same as the one you
+    # created today, and the same as the one CI creates.
+    #
+    # This is the default image for kind v0.33.0 (Kubernetes 1.37), verified
+    # on 2026-11-12. If you install a different kind release, take the image
+    # and digest from THAT release's notes; mixing a kind binary with a node
+    # image built for another kind version is a known cause of clusters that
+    # fail to start.
+    image: kindest/node:v1.37.0@sha256:a1ed56cfb0e7b93589bdf97c8cd566405a265939e3620fc4f5de89adff580ae5
+
+    # Publish one port from the node container to your machine, so a Service
+    # of type NodePort on port 30080 is reachable at http://localhost:8080.
+    #
+    # listenAddress 127.0.0.1 keeps it private to your laptop. The default
+    # (0.0.0.0) would expose it to everyone on the same Wi-Fi network.
+    extraPortMappings:
+      - containerPort: 30080
+        hostPort: 8080
+        listenAddress: "127.0.0.1"
+        protocol: TCP
+
+# What is deliberately NOT here:
+#
+#   - Extra worker nodes. Add `- role: worker` entries when you want to watch
+#     pods being rescheduled across nodes (a STRETCH exercise). Each node
+#     costs roughly 500 MB to 1 GB of memory.
+#   - An ingress controller. The MUST path exposes the app with a Service
+#     only. The community ingress-nginx controller that most older tutorials
+#     install was retired in March 2026 and receives no security fixes; if
+#     you want HTTP routing, use the Gateway API (a SHOULD item in Week 4).
+#   - A local registry. You load images straight into the node with
+#     `kind load docker-image <image> --name parcelo`.

@@ -1,0 +1,146 @@
+# Parcelo tracker: local development stack
+#
+# This file is given to you working. READ IT. You will be asked (by your own
+# self-review checklist) what every block does and why it is written this way,
+# because the same ideas come back in Kubernetes in Week 2:
+#
+#   Compose concept here                 Kubernetes concept in Week 2
+#   -----------------------------------  ---------------------------------
+#   service                              Deployment / StatefulSet + Service
+#   healthcheck                          readiness and liveness probes
+#   depends_on + condition               init containers, probes, Jobs
+#   one-shot `migrate` service           Job or init container
+#   environment / .env                   ConfigMap and Secret
+#   named volume                         PersistentVolumeClaim
+#   service name as hostname (`db`)      Service DNS name
+#
+# ---------------------------------------------------------------------------
+# Usage (run from the repo root, inside WSL2):
+#
+#   cp .env.example .env                 # once; .env is ignored by git
+#   docker compose up --build -d         # build the image, start everything
+#   docker compose ps                    # all services should be healthy
+#   scripts/smoke.sh http://localhost:8000
+#   docker compose logs -f api           # JSON logs, one object per line
+#   docker compose down                  # stop, keep the database volume
+#   docker compose down -v               # stop and wipe the database
+#
+# ---------------------------------------------------------------------------
+# Hostnames: FROM INSIDE a container   vs.   FROM YOUR LAPTOP
+#
+#   API         api:8000                     localhost:8000
+#   PostgreSQL  db:5432                      localhost:5432
+#
+# Inside the Compose network, services reach each other by SERVICE NAME.
+# `localhost` inside a container means that container itself. Mixing these up
+# is the most common Compose mistake, and it is the same mistake people make
+# with Kubernetes Service names.
+# ---------------------------------------------------------------------------
+
+name: parcelo
+
+# The database URL is needed by two services. Define it once and reuse it.
+#
+# `x-` keys are ignored by Compose, so they are a place to park shared values.
+# `&database-url` names the value (a YAML anchor) and `*database-url` further
+# down inserts it (an alias). The hostname is `db`, the SERVICE NAME of the
+# database, not localhost.
+x-database-url: &database-url >-
+  postgresql+psycopg://${POSTGRES_USER:?copy .env.example to .env first}:${POSTGRES_PASSWORD:?copy .env.example to .env first}@db:5432/${POSTGRES_DB:?copy .env.example to .env first}
+
+services:
+  # PostgreSQL 17.
+  #
+  # Why 17 and not 18: from PostgreSQL 18 the official image moved its data
+  # directory, and the volume must be mounted at /var/lib/postgresql instead
+  # of /var/lib/postgresql/data. Mount the wrong path for your version and
+  # the database works but silently loses its data when the container is
+  # recreated. Pinning 17 keeps the well-known path. If you upgrade the image,
+  # read the "PGDATA" section of the image documentation first.
+  db:
+    image: postgres:17-alpine
+    environment:
+      # Values come from .env. ${VAR:?message} makes Compose stop with a clear
+      # error if a variable is missing, instead of starting a database with an
+      # empty password.
+      POSTGRES_USER: ${POSTGRES_USER:?copy .env.example to .env first}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?copy .env.example to .env first}
+      POSTGRES_DB: ${POSTGRES_DB:?copy .env.example to .env first}
+    ports:
+      # Bound to 127.0.0.1 so the database is reachable from your laptop (for
+      # psql or the integration tests) but not from other machines on the
+      # network. A bare "5432:5432" listens on every interface.
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      # "The container started" is not "the database accepts connections".
+      # pg_isready asks the server itself. Other services wait on this.
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    restart: unless-stopped
+
+  # Database migrations, run once and then exit.
+  #
+  # Schema changes are a separate step from starting the app. If every API
+  # replica ran migrations at startup, two replicas starting together would
+  # race each other. A one-shot step that must succeed before the app starts
+  # is the safe pattern. In Week 2 you decide how to express the same idea in
+  # Kubernetes.
+  migrate:
+    build: .
+    image: parcelo-tracker:dev
+    command: ["alembic", "upgrade", "head"]
+    environment:
+      DATABASE_URL: *database-url
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+
+  # The API.
+  api:
+    build: .
+    image: parcelo-tracker:dev
+    environment:
+      DATABASE_URL: *database-url
+      APP_ENV: compose
+      # GET /version reports this. Locally it defaults to "dev"; your pipeline
+      # will inject the real commit SHA.
+      GIT_SHA: ${GIT_SHA:-dev}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      # Chaos switches for the drills. Leave them off unless a drill says so.
+      CHAOS_FAIL_READY: ${CHAOS_FAIL_READY:-false}
+      CHAOS_CRASH_ON_START: ${CHAOS_CRASH_ON_START:-false}
+      CHAOS_ERROR_RATE: ${CHAOS_ERROR_RATE:-0}
+    ports:
+      - "8000:8000"
+    depends_on:
+      # Start only after migrations finished successfully. If `migrate` fails,
+      # the API does not start, which is what you want: an app running against
+      # the wrong schema is worse than an app that is down.
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      # Uses Python instead of curl on purpose. curl exists in the large base
+      # image you start with, but not in the slim image you will move to, and
+      # a healthcheck that depends on a tool the image lacks reports
+      # "unhealthy" forever. The check hits READINESS, so it also fails when
+      # the database is unreachable.
+      test:
+        - CMD
+        - python
+        - -c
+        - "import sys, urllib.request; sys.exit(0 if urllib.request.urlopen('http://localhost:8000/health/ready', timeout=3).status == 200 else 1)"
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+volumes:
+  # A named volume outlives the container. `docker compose down` keeps it;
+  # `docker compose down -v` deletes it.
+  pgdata:

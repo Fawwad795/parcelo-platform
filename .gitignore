@@ -1,0 +1,50 @@
+# --- Secrets and local configuration: never commit ---------------------------
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+kubeconfig
+kubeconfig.*
+*.kubeconfig
+
+# --- Python --------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.coverage
+coverage.xml
+htmlcov/
+*.db
+
+# --- Terraform -----------------------------------------------------------------
+# State can contain sensitive values and must live in the remote backend, not
+# in git. The lock file (.terraform.lock.hcl) is the opposite: commit it, it
+# pins provider versions for everyone.
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+tfplan
+crash.log
+# Variable files often hold account-specific or sensitive values.
+*.auto.tfvars
+terraform.tfvars
+
+# --- Helm / Kubernetes ---------------------------------------------------------
+*.tgz
+charts/*/charts/
+
+# --- Scan and build output -----------------------------------------------------
+*.sarif
+sbom*.json
+trivy-results*
+
+# --- Editors and OS ------------------------------------------------------------
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

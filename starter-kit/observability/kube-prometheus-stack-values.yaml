@@ -1,0 +1,115 @@
+# Helm values for kube-prometheus-stack on the local kind cluster (Week 4).
+#
+# This file is given to you working. READ IT: you will be asked what each
+# block switches off and why.
+#
+# Install (chart version checked on 2026-11-12; the chart is published as an
+# OCI artifact, so there is no `helm repo add` step):
+#
+#   helm upgrade --install monitoring \
+#     oci://ghcr.io/prometheus-community/charts/kube-prometheus-stack \
+#     --version 93.2.2 \
+#     --namespace monitoring --create-namespace \
+#     -f observability/kube-prometheus-stack-values.yaml \
+#     --wait --timeout 10m
+#
+# What you get: the Prometheus Operator, one Prometheus, one Alertmanager,
+# Grafana with Kubernetes dashboards, node-exporter and kube-state-metrics.
+# Expect about 1.5 GB of memory. That is why this stack runs on your laptop's
+# kind cluster and not on the small AWS node.
+#
+# Open the UIs with port-forwarding (nothing is exposed outside the cluster).
+# Service names are built from the release name; if these do not match, list
+# them with `kubectl -n monitoring get svc`.
+#
+#   kubectl -n monitoring port-forward svc/monitoring-kube-prometheus-prometheus 9090
+#   kubectl -n monitoring port-forward svc/monitoring-grafana 3000:80
+#
+# Grafana's admin password is generated at install time and stored in a
+# Kubernetes Secret. It is NOT in this file and must never be. Read it with:
+#
+#   kubectl -n monitoring get secret monitoring-grafana \
+#     -o jsonpath='{.data.admin-password}' | base64 -d; echo
+#
+# First thing to check after install: Prometheus > Status > Targets. Every
+# target should be UP. Do not build a dashboard on top of a target that is
+# down.
+
+# ---------------------------------------------------------------------------
+# Control-plane components that kind does not expose for scraping.
+#
+# On kind, etcd, the controller manager, the scheduler and kube-proxy listen
+# on addresses Prometheus cannot reach. Left enabled, they show up as
+# permanently DOWN targets and fire alerts that mean nothing, which teaches
+# you to ignore red. Switch them off here rather than learning to look past
+# them. (On a managed cluster such as EKS you cannot scrape most of these
+# either, for the same reason: you do not run the control plane.)
+# ---------------------------------------------------------------------------
+kubeEtcd:
+  enabled: false
+kubeControllerManager:
+  enabled: false
+kubeScheduler:
+  enabled: false
+kubeProxy:
+  enabled: false
+
+prometheus:
+  prometheusSpec:
+    # How long samples are kept. Two days is plenty for a laptop and keeps
+    # disk use small. Production systems keep weeks and ship older data to
+    # long-term storage.
+    retention: 2d
+
+    # By default this Prometheus only picks up ServiceMonitors and rules that
+    # carry the Helm release label of THIS chart. Your tracker chart is a
+    # different release, so its ServiceMonitor would be silently ignored and
+    # you would spend an evening wondering why no target appears.
+    #
+    # Setting these to false makes Prometheus select ServiceMonitors,
+    # PodMonitors and PrometheusRules from every namespace regardless of
+    # release label. Fine for a single-tenant laptop cluster. In a shared
+    # cluster you would instead keep the default and label your objects.
+    serviceMonitorSelectorNilUsesHelmValues: false
+    podMonitorSelectorNilUsesHelmValues: false
+    ruleSelectorNilUsesHelmValues: false
+
+    # Requests are what the scheduler reserves; limits are the ceiling. Small
+    # numbers here because the workload is tiny.
+    resources:
+      requests:
+        cpu: 100m
+        memory: 400Mi
+      limits:
+        memory: 1Gi
+
+alertmanager:
+  alertmanagerSpec:
+    resources:
+      requests:
+        cpu: 10m
+        memory: 50Mi
+      limits:
+        memory: 200Mi
+
+grafana:
+  # Dashboards for the cluster ship with the chart. Your own dashboard for
+  # the tracker (task 4.6) is loaded the same way they are: a ConfigMap with
+  # the label `grafana_dashboard: "1"` is picked up automatically by a
+  # sidecar. Keep the dashboard JSON in git; a dashboard that exists only in
+  # the Grafana UI is lost the next time you delete the cluster.
+  defaultDashboardsTimezone: browser
+  resources:
+    requests:
+      cpu: 50m
+      memory: 150Mi
+    limits:
+      memory: 400Mi
+
+# TODO(4.6): after installing, make Prometheus scrape the tracker. Do NOT add
+# a scrape config here. Add a ServiceMonitor template to YOUR chart
+# (charts/tracker), enabled by a value, pointing at the Service port that
+# serves /metrics. Then confirm the target is UP and that this query returns
+# data:
+#
+#   sum by (path, status) (rate(http_requests_total[5m]))

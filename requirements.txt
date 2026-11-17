@@ -1,0 +1,16 @@
+# Runtime dependencies. This is all the production image needs.
+#
+# Every version is pinned exactly. A pipeline that installs "whatever is
+# newest today" is not reproducible: the same commit can pass on Monday and
+# fail on Tuesday. Dependabot (Week 1) is how pinned versions stay current
+# without you checking by hand.
+#
+# These versions were installed together and tested on Python 3.13 on
+# 2026-11-12 (see assignment/verified-versions.md).
+fastapi==0.162.4
+uvicorn[standard]==0.54.0
+sqlalchemy==2.1.8
+psycopg[binary]==3.3.8
+alembic==1.20.1
+pydantic-settings==2.16.2
+prometheus-client==0.26.0

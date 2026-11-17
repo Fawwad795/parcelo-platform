@@ -1,0 +1,164 @@
+# Week 1 skeleton: continuous integration for the Parcelo tracker.
+#
+# Copy this file to .github/workflows/ci.yml when you reach task 1.4, then
+# replace each placeholder with real steps. Work top to bottom: get the `test`
+# job green before you touch `gates`, and `gates` before `image`.
+#
+# What this pipeline is for
+# -------------------------
+# Today a change reaches Parcelo's server when someone remembers to deploy it,
+# and nothing checks it first. This workflow is the gate: every change is
+# linted, tested, checked for secrets, built into an image and scanned before
+# it can merge, and an image is published only if all of that passed. A red
+# run must block the merge (you enforce that with a ruleset in task 1.3).
+#
+# Ground rules for every workflow in this repo (see assignment/part-a.md, 3.2 to 3.5)
+# -----------------------------------------------------------------------------
+#   1. Pin the runner image. `ubuntu-latest` moves to Ubuntu 26.04 during
+#      November 2026; a pipeline that changes under you mid-project is a
+#      pipeline you cannot trust. Use `ubuntu-24.04`.
+#   2. Start from zero permissions (`permissions: {}` below) and grant each
+#      job only what it needs.
+#   3. Pin every third-party action to a full 40-character commit SHA, with
+#      the version in a trailing comment. Tags can be moved; SHAs cannot.
+#      Starting versions and SHAs are in assignment/verified-versions.md.
+#   4. Call `make` targets rather than repeating commands, so CI and your
+#      laptop run exactly the same thing.
+#   5. No secrets in this file. Ever.
+
+name: ci
+
+on:
+  # TODO(1.4): choose the triggers. The pipeline must run for every pull
+  # request that targets main, and for every push to main. Think about why
+  # running on push to EVERY branch as well would double your runs.
+  #
+  # `workflow_dispatch` (a manual "Run workflow" button) is kept so the file
+  # is valid from the first commit and so you can re-run on demand.
+  workflow_dispatch:
+
+# Nothing is allowed unless a job asks for it.
+permissions: {}
+
+# TODO(1.5): add a `concurrency` block so that pushing a new commit to a pull
+# request cancels the run for the previous commit. Decide whether runs on main
+# should ever be cancelled, and write your reasoning in docs/pipeline.md.
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Job 1: lint and test
+  #
+  # Must achieve:
+  #   - check out the code
+  #   - set up Python 3.13 with dependency caching (TODO 1.5)
+  #   - run the linter and the formatter check; either failing fails the job
+  #   - run the unit tests with coverage; below the threshold in
+  #     pyproject.toml fails the job
+  #   - publish the coverage report as an artifact and write a short job
+  #     summary (TODO 1.5)
+  #
+  # SHOULD: a second job that starts a PostgreSQL service container and runs
+  # the tests marked `integration` (see tests/test_integration_postgres.py).
+  #
+  # Permissions needed: read the repository contents. Nothing else.
+  #
+  # Done when: a pull request with a failing test, a lint error or a
+  # formatting error shows a red check, and the run takes noticeably less
+  # time the second time because the cache was restored.
+  # ---------------------------------------------------------------------------
+  test:
+    name: Lint and test
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Placeholder (replace with real steps)
+        run: |
+          echo "ci.yml is still the starter-kit skeleton: the test job has no real steps."
+          exit 1
+
+  # ---------------------------------------------------------------------------
+  # Job 2: repository gates (runs in parallel with `test`)
+  #
+  # These checks read the repository, not the image, so they do not wait for
+  # anything.
+  #
+  # Must achieve (TODO 1.8):
+  #   - scan the FULL git history for committed secrets and fail on any
+  #     (a shallow checkout only sees the latest commit: the checkout step
+  #     needs the whole history)
+  #   - lint the Dockerfile and fail on findings you have not explicitly
+  #     ignored in a config file, with a reason
+  #
+  # SHOULD (TODO 1.9):
+  #   - lint the workflows themselves (actionlint, zizmor)
+  #
+  # Permissions needed: read contents. A scanner must not be able to write
+  # anything.
+  #
+  # Done when: the leaked-secret drill passes (a planted fake key is caught
+  # here even after you force it past your local hook).
+  # ---------------------------------------------------------------------------
+  gates:
+    name: Repository gates
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Placeholder (replace with real steps)
+        run: |
+          echo "ci.yml is still the starter-kit skeleton: the gates job has no real steps."
+          exit 1
+
+  # ---------------------------------------------------------------------------
+  # Job 3: build the image, scan it, and only then publish it
+  #
+  # The order inside this job is the point. An image that failed its scan
+  # must never reach the registry, so the steps are: build, scan, push.
+  #
+  # Must achieve:
+  #   - run only after `test` and `gates` both succeeded
+  #   - build the image ONCE with Buildx, using a build cache, and load it
+  #     into the runner's Docker instead of pushing it (TODO 1.7)
+  #   - pass the commit SHA into the image so GET /version reports it
+  #   - scan that local image for known vulnerabilities and FAIL on HIGH or
+  #     CRITICAL findings that have a fix available (TODO 1.8)
+  #   - on pushes to main ONLY, push the image to ghcr.io tagged with the
+  #     FULL commit SHA. With the cache warm this second build step is
+  #     instant. On pull requests: build and scan, never push.
+  #   - decide what, if anything, gets a moving tag such as `main`, and
+  #     justify it in docs/pipeline.md. Nothing gets `latest`.
+  #
+  # SHOULD (TODO 1.8): generate an SBOM for the published image and attach it
+  # to the run as an artifact.
+  #
+  # Permissions needed: read contents, write packages. Authenticate to GHCR
+  # with the automatic GITHUB_TOKEN. Do not create a personal access token.
+  #
+  # Gotcha 1: registry image names must be lowercase. `github.repository`
+  # keeps the capital letters of your user name, and `docker push` rejects
+  # them. The metadata action lowercases its own output; anywhere ELSE you
+  # build the name yourself (the scan step, later the deploy workflow), you
+  # must lowercase it yourself.
+  #
+  # Gotcha 2: the first push creates the package as PRIVATE even though the
+  # repository is public. Make it public once in the package settings, or
+  # kind and k3s will fail to pull it later with ImagePullBackOff. That
+  # switch cannot be undone, which is fine: the image holds no secrets, and
+  # this job is how you know.
+  #
+  # Think about: a scanner is a third-party action that runs with your
+  # token. In March 2026 the most popular scanner action had 76 of its 77
+  # version tags repointed at credential-stealing code. Ground rule 3 is the
+  # reason the people who pinned SHAs were not affected.
+  #
+  # Done when: `docker pull ghcr.io/<you>/<repo>:<full-sha>` works from your
+  # laptop without logging in, `docker run` of that image answers /version
+  # with the same SHA, and the vulnerable-dependency drill ends with a red
+  # run and NO new image in the registry.
+  # ---------------------------------------------------------------------------
+  image:
+    name: Build, scan and publish image
+    runs-on: ubuntu-24.04
+    needs: [test, gates]
+    steps:
+      - name: Placeholder (replace with real steps)
+        run: |
+          echo "ci.yml is still the starter-kit skeleton: the image job has no real steps."
+          exit 1

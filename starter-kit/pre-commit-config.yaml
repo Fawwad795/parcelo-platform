@@ -1,0 +1,49 @@
+# Week 1 skeleton: pre-commit hooks.
+#
+# Copy to .pre-commit-config.yaml at task 1.8, then:
+#
+#   pipx install pre-commit      # or: pip install --user pre-commit
+#   pre-commit install           # installs the git hook in THIS clone
+#   pre-commit run --all-files   # run every hook once on the whole repo
+#
+# Why this exists
+# ---------------
+# CI catches a leaked secret AFTER it has been pushed, which means it is
+# already in the remote history and must be treated as compromised. A
+# pre-commit hook catches it BEFORE the commit exists. Defence in depth for
+# secrets has three layers, and you will see each one work in the Week 1
+# drill:
+#
+#   1. this hook, on your laptop                  (before commit)
+#   2. GitHub push protection                     (at push)
+#   3. the secret scan in ci.yml                  (after push)
+#
+# Hooks are a convenience for you, not a control: anyone can skip them with
+# `git commit --no-verify`. That is why layer 3 must exist as well.
+#
+# Pin each hook repo to a tag (`rev`). Starting versions are in
+# assignment/verified-versions.md.
+
+repos:
+  # Basic hygiene that prevents noisy diffs and broken files.
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+      - id: check-yaml
+        # Helm templates contain `{{ ... }}` and are not valid YAML until
+        # rendered.
+        exclude: ^charts/.*/templates/
+      - id: check-added-large-files
+
+  # TODO(1.8): add the gitleaks hook so a commit containing a secret is
+  # refused. The hook is published in the gitleaks repository itself; look at
+  # .pre-commit-hooks.yaml there to choose between the `gitleaks` id (builds
+  # with Go), `gitleaks-system` (uses a gitleaks binary you installed) and
+  # `gitleaks-docker`.
+
+  # TODO(1.8, SHOULD): add ruff (lint and format) so style problems are fixed
+  # before CI ever sees them. The hooks live in astral-sh/ruff-pre-commit.
+
+  # TODO(3.8, SHOULD): add terraform fmt once you have Terraform code.

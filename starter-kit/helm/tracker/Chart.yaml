@@ -1,0 +1,23 @@
+# Helm chart metadata for the Parcelo tracker.
+#
+# Copy the whole starter-kit/helm/tracker folder to charts/tracker at task 2.5.
+#
+# Two version numbers live here and they mean different things:
+#
+#   version     the version of THE CHART (the packaging). Bump it whenever a
+#               template or a default value changes. Helm and OCI registries
+#               identify a chart by name + this version, and a pushed version
+#               must never be overwritten with different content.
+#   appVersion  the version of THE APPLICATION the chart deploys by default.
+#               Informational. The image actually deployed is decided by the
+#               image tag value, which your pipeline sets to a commit SHA.
+#
+# Keeping them separate lets you ship a chart fix without pretending the app
+# changed, and deploy a new app build without republishing the chart.
+
+apiVersion: v2
+name: tracker
+description: Parcelo tracker API and its PostgreSQL database
+type: application
+version: 0.1.0
+appVersion: "1.0.0"

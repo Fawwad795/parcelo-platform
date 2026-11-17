@@ -1,0 +1,74 @@
+# Week 4 skeleton: alert rules for the tracker (task 4.7).
+#
+# Copy to observability/tracker-alerts.yaml and apply it to the kind cluster:
+#
+#   kubectl apply -f observability/tracker-alerts.yaml
+#
+# A PrometheusRule is a custom resource. The Prometheus Operator watches for
+# these objects and loads their rules into Prometheus, so alert rules live in
+# git and are reviewed like code. (SHOULD: move this into your Helm chart as
+# a template, behind the same switch as the ServiceMonitor.)
+#
+# What makes an alert good
+# ------------------------
+#   - It fires on a SYMPTOM users feel (requests failing, requests slow), not
+#     on a cause (CPU high). Causes are for dashboards.
+#   - It is actionable: whoever is woken by it knows what to do. Put a
+#     runbook link in the annotations.
+#   - It has a `for:` duration so one bad scrape does not page anyone.
+#   - It is tested. An alert that has never fired is a guess. The Week 4
+#     drill makes each of these fire with the CHAOS_ switches.
+#
+# The metrics you have (see app/metrics.py):
+#   http_requests_total{method, path, status}
+#   http_request_duration_seconds_bucket{method, path, le}
+#   parcels_created_total, parcel_status_transitions_total{to_status}
+#   app_info{version, git_sha, environment}
+# plus what kube-state-metrics provides about your Deployment and pods.
+
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: tracker-alerts
+  namespace: parcelo
+spec:
+  groups:
+    - name: tracker.availability
+      rules:
+        # MUST 1: the API is returning too many errors.
+        #
+        # TODO(4.7): replace the placeholder expression. It must be true when
+        # more than 5 percent of requests to /api paths over the last 5
+        # minutes ended with a 5xx status. Think about: what does your
+        # expression evaluate to when there is no traffic at all, and is that
+        # what you want?
+        - alert: TrackerHighErrorRate
+          expr: vector(0) > 1  # placeholder that never fires
+          for: 2m
+          labels:
+            severity: page
+          annotations:
+            summary: "TODO(4.7): one sentence a tired person can understand"
+            description: "TODO(4.7): what is happening, with the measured value"
+            runbook_url: "TODO(4.7): link to the matching section of docs/runbook.md"
+
+        # MUST 2: fewer ready replicas than desired for several minutes.
+        #
+        # TODO(4.7): write this one from scratch using kube-state-metrics
+        # (kube_deployment_status_replicas_available and
+        # kube_deployment_spec_replicas). This is the alert that should fire
+        # during the failed health check drill.
+
+        # MUST 3: Prometheus cannot see the tracker at all.
+        #
+        # TODO(4.7): write this one too. The two alerts above are both built
+        # from metrics, so they go SILENT when the metrics stop arriving: no
+        # data looks exactly like no problem. This alert covers that blind
+        # spot. Look at the `up` metric for your scrape job, and at the
+        # `absent()` function for the case where the series does not exist.
+
+    # SHOULD: latency. p95 request duration above your SLO threshold, computed
+    # with histogram_quantile over http_request_duration_seconds_bucket.
+
+    # SHOULD: recording rules, so dashboards and alerts share one definition
+    # of "error ratio" instead of two slightly different queries.

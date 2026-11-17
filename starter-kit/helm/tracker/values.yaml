@@ -1,0 +1,53 @@
+# Default values for the tracker chart (skeleton).
+#
+# values.yaml is the PUBLIC INTERFACE of your chart: everything someone may
+# change per environment without editing a template. Design it like an API.
+# Too few values and every environment needs a template change; too many and
+# nobody can tell which ones matter.
+#
+# Per-environment overrides go in separate files that set ONLY what differs:
+#
+#   values-kind.yaml   local cluster (Week 2)
+#   values-aws.yaml    k3s on EC2 (Week 4)
+#
+# Rules:
+#   - Every value used by a template has a default here and a comment saying
+#     what it does.
+#   - No secrets in any values file committed to git. The database password
+#     is created in the cluster out of band (see TODO 2.3) and the chart only
+#     references the Secret by name.
+#   - Defaults must be SAFE. A chart installed with no overrides should start
+#     and should not enable any chaos switch.
+
+image:
+  # TODO(2.5): repository of the image you push in Week 1, for example
+  # ghcr.io/<your-user>/<your-repo>
+  repository: ""
+  # The pipeline sets this to a commit SHA at deploy time. Avoid `latest`:
+  # with a moving tag you cannot tell what is running or roll back to it.
+  tag: ""
+  # TODO(2.5): choose a pull policy and explain it. Consider what happens on
+  # kind, where the image is loaded into the node and exists in no registry.
+  pullPolicy: ""
+
+# TODO(2.5): replicaCount, and why one replica makes a rolling update
+# impossible to observe.
+
+# TODO(2.4): resources (requests and limits) for the API container. Measure
+# with `kubectl top pod` before you choose numbers; do not guess.
+
+# TODO(2.4): probe settings (paths, periods, thresholds) for startup,
+# readiness and liveness. Which endpoint belongs to which probe, and why must
+# liveness NOT check the database?
+
+# TODO(2.5): service type and ports. ClusterIP or NodePort on kind,
+# LoadBalancer on k3s (its built-in ServiceLB makes that work on one node).
+
+# TODO(2.5): application settings passed as environment variables
+# (APP_ENV, LOG_LEVEL, GIT_SHA) and the chaos switches, all defaulting to off.
+
+# TODO(2.3): database settings: the PostgreSQL image, storage size, and the
+# NAME of the existing Secret that holds the credentials.
+
+# TODO(4.6): serviceMonitor.enabled (default false), so the chart still
+# installs on a cluster that has no Prometheus Operator CRDs.
